@@ -11,17 +11,27 @@ import (
 )
 
 type Querier interface {
+	ClearDefaultAddresses(ctx context.Context, userID uuid.UUID) error
+	CountAddresses(ctx context.Context, userID uuid.UUID) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) error
+	DeleteAddress(ctx context.Context, arg DeleteAddressParams) (int64, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash string) error
 	DeleteUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
 	GetActivePasswordReset(ctx context.Context, tokenHash string) (GetActivePasswordResetRow, error)
+	GetAddress(ctx context.Context, arg GetAddressParams) (IdentityAddress, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (GetRefreshTokenRow, error)
 	GetUserByEmail(ctx context.Context, email string) (IdentityUser, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (IdentityUser, error)
+	InsertAddress(ctx context.Context, arg InsertAddressParams) error
 	InsertPasswordReset(ctx context.Context, arg InsertPasswordResetParams) error
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) error
+	ListAddresses(ctx context.Context, userID uuid.UUID) ([]IdentityAddress, error)
 	MarkPasswordResetUsed(ctx context.Context, id uuid.UUID) error
+	NewestAddressID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
+	SetAddressDefault(ctx context.Context, arg SetAddressDefaultParams) error
+	UpdateAddress(ctx context.Context, arg UpdateAddressParams) error
 	UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error
+	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (IdentityUser, error)
 }
 
 var _ Querier = (*Queries)(nil)

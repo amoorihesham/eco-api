@@ -29,6 +29,19 @@ type Repository interface {
 	InsertPasswordReset(ctx context.Context, tx pgx.Tx, pr domain.PasswordReset) error
 	GetActivePasswordReset(ctx context.Context, tokenHash string) (domain.PasswordReset, error)
 	MarkPasswordResetUsed(ctx context.Context, tx pgx.Tx, id uuid.UUID) error
+
+	// --- account (P4) ---
+	UpdateUserName(ctx context.Context, tx pgx.Tx, userID uuid.UUID, name string) (domain.User, error)
+
+	ListAddresses(ctx context.Context, userID uuid.UUID) ([]domain.Address, error)
+	GetAddress(ctx context.Context, userID, id uuid.UUID) (domain.Address, error)
+	CountAddresses(ctx context.Context, userID uuid.UUID) (int, error)
+	InsertAddress(ctx context.Context, tx pgx.Tx, a domain.Address) error
+	UpdateAddress(ctx context.Context, tx pgx.Tx, a domain.Address) error
+	DeleteAddress(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) (int64, error)
+	ClearDefaultAddresses(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
+	SetAddressDefault(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error
+	NewestAddressID(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (uuid.UUID, error)
 }
 
 // Outbox is the publish port (satisfied by *events.Outbox) — kept narrow for testability.

@@ -9,4 +9,8 @@ var (
 	ErrEmailTaken         = errors.New("email already registered")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidToken       = errors.New("invalid or expired token")
+
+	// P4 — Account.
+	ErrUserNotFound    = errors.New("user not found")
+	ErrAddressNotFound = errors.New("address not found") // also returned for a foreign address (no leak)
 )

@@ -38,6 +38,29 @@ func (fakeRepo) GetActivePasswordReset(context.Context, string) (domain.Password
 }
 func (fakeRepo) MarkPasswordResetUsed(context.Context, pgx.Tx, uuid.UUID) error { return nil }
 
+// --- account (P4) no-ops, so fakeRepo still satisfies service.Repository ---
+
+func (fakeRepo) UpdateUserName(context.Context, pgx.Tx, uuid.UUID, string) (domain.User, error) {
+	return domain.User{}, nil
+}
+func (fakeRepo) ListAddresses(context.Context, uuid.UUID) ([]domain.Address, error) { return nil, nil }
+func (fakeRepo) GetAddress(context.Context, uuid.UUID, uuid.UUID) (domain.Address, error) {
+	return domain.Address{}, pgx.ErrNoRows
+}
+func (fakeRepo) CountAddresses(context.Context, uuid.UUID) (int, error)      { return 0, nil }
+func (fakeRepo) InsertAddress(context.Context, pgx.Tx, domain.Address) error { return nil }
+func (fakeRepo) UpdateAddress(context.Context, pgx.Tx, domain.Address) error { return nil }
+func (fakeRepo) DeleteAddress(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) (int64, error) {
+	return 0, nil
+}
+func (fakeRepo) ClearDefaultAddresses(context.Context, pgx.Tx, uuid.UUID) error { return nil }
+func (fakeRepo) SetAddressDefault(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
+	return nil
+}
+func (fakeRepo) NewestAddressID(context.Context, pgx.Tx, uuid.UUID) (uuid.UUID, error) {
+	return uuid.Nil, pgx.ErrNoRows
+}
+
 type fakeHasher struct{}
 
 func (fakeHasher) Hash(p string) (string, error) { return "hash:" + p, nil }

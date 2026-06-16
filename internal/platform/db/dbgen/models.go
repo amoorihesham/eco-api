@@ -8,6 +8,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type IdentityAddress struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Recipient  string
+	Line1      string
+	Line2      string
+	City       string
+	Region     string
+	PostalCode string
+	Country    string
+	Phone      string
+	IsDefault  bool
+	CreatedAt  pgtype.Timestamptz
+}
+
 type IdentityPasswordReset struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

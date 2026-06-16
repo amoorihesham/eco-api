@@ -12,6 +12,26 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearDefaultAddresses = `-- name: ClearDefaultAddresses :exec
+UPDATE identity_addresses SET is_default = false WHERE user_id = $1 AND is_default
+`
+
+func (q *Queries) ClearDefaultAddresses(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearDefaultAddresses, userID)
+	return err
+}
+
+const countAddresses = `-- name: CountAddresses :one
+SELECT count(*) FROM identity_addresses WHERE user_id = $1
+`
+
+func (q *Queries) CountAddresses(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAddresses, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createUser = `-- name: CreateUser :exec
 INSERT INTO identity_users (id, email, password_hash, name, role, created_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -36,6 +56,23 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const deleteAddress = `-- name: DeleteAddress :execrows
+DELETE FROM identity_addresses WHERE id = $1 AND user_id = $2
+`
+
+type DeleteAddressParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAddress, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteRefreshToken = `-- name: DeleteRefreshToken :exec
@@ -77,6 +114,37 @@ func (q *Queries) GetActivePasswordReset(ctx context.Context, tokenHash string) 
 		&i.UserID,
 		&i.TokenHash,
 		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getAddress = `-- name: GetAddress :one
+SELECT id, user_id, recipient, line1, line2, city, region, postal_code, country, phone, is_default, created_at
+FROM identity_addresses
+WHERE id = $1 AND user_id = $2
+`
+
+type GetAddressParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetAddress(ctx context.Context, arg GetAddressParams) (IdentityAddress, error) {
+	row := q.db.QueryRow(ctx, getAddress, arg.ID, arg.UserID)
+	var i IdentityAddress
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Recipient,
+		&i.Line1,
+		&i.Line2,
+		&i.City,
+		&i.Region,
+		&i.PostalCode,
+		&i.Country,
+		&i.Phone,
+		&i.IsDefault,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -143,6 +211,43 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (IdentityUser, 
 	return i, err
 }
 
+const insertAddress = `-- name: InsertAddress :exec
+INSERT INTO identity_addresses
+    (id, user_id, recipient, line1, line2, city, region, postal_code, country, phone, is_default)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+`
+
+type InsertAddressParams struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Recipient  string
+	Line1      string
+	Line2      string
+	City       string
+	Region     string
+	PostalCode string
+	Country    string
+	Phone      string
+	IsDefault  bool
+}
+
+func (q *Queries) InsertAddress(ctx context.Context, arg InsertAddressParams) error {
+	_, err := q.db.Exec(ctx, insertAddress,
+		arg.ID,
+		arg.UserID,
+		arg.Recipient,
+		arg.Line1,
+		arg.Line2,
+		arg.City,
+		arg.Region,
+		arg.PostalCode,
+		arg.Country,
+		arg.Phone,
+		arg.IsDefault,
+	)
+	return err
+}
+
 const insertPasswordReset = `-- name: InsertPasswordReset :exec
 INSERT INTO identity_password_resets (id, user_id, token_hash, expires_at)
 VALUES ($1, $2, $3, $4)
@@ -187,12 +292,115 @@ func (q *Queries) InsertRefreshToken(ctx context.Context, arg InsertRefreshToken
 	return err
 }
 
+const listAddresses = `-- name: ListAddresses :many
+SELECT id, user_id, recipient, line1, line2, city, region, postal_code, country, phone, is_default, created_at
+FROM identity_addresses
+WHERE user_id = $1
+ORDER BY is_default DESC, created_at DESC
+`
+
+func (q *Queries) ListAddresses(ctx context.Context, userID uuid.UUID) ([]IdentityAddress, error) {
+	rows, err := q.db.Query(ctx, listAddresses, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IdentityAddress{}
+	for rows.Next() {
+		var i IdentityAddress
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Recipient,
+			&i.Line1,
+			&i.Line2,
+			&i.City,
+			&i.Region,
+			&i.PostalCode,
+			&i.Country,
+			&i.Phone,
+			&i.IsDefault,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markPasswordResetUsed = `-- name: MarkPasswordResetUsed :exec
 UPDATE identity_password_resets SET used_at = now() WHERE id = $1
 `
 
 func (q *Queries) MarkPasswordResetUsed(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markPasswordResetUsed, id)
+	return err
+}
+
+const newestAddressID = `-- name: NewestAddressID :one
+SELECT id FROM identity_addresses WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
+`
+
+func (q *Queries) NewestAddressID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, newestAddressID, userID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const setAddressDefault = `-- name: SetAddressDefault :exec
+UPDATE identity_addresses SET is_default = true WHERE id = $1 AND user_id = $2
+`
+
+type SetAddressDefaultParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) SetAddressDefault(ctx context.Context, arg SetAddressDefaultParams) error {
+	_, err := q.db.Exec(ctx, setAddressDefault, arg.ID, arg.UserID)
+	return err
+}
+
+const updateAddress = `-- name: UpdateAddress :exec
+UPDATE identity_addresses
+SET recipient = $3, line1 = $4, line2 = $5, city = $6, region = $7,
+    postal_code = $8, country = $9, phone = $10, is_default = $11
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateAddressParams struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Recipient  string
+	Line1      string
+	Line2      string
+	City       string
+	Region     string
+	PostalCode string
+	Country    string
+	Phone      string
+	IsDefault  bool
+}
+
+func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) error {
+	_, err := q.db.Exec(ctx, updateAddress,
+		arg.ID,
+		arg.UserID,
+		arg.Recipient,
+		arg.Line1,
+		arg.Line2,
+		arg.City,
+		arg.Region,
+		arg.PostalCode,
+		arg.Country,
+		arg.Phone,
+		arg.IsDefault,
+	)
 	return err
 }
 
@@ -208,4 +416,28 @@ type UpdatePasswordHashParams struct {
 func (q *Queries) UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error {
 	_, err := q.db.Exec(ctx, updatePasswordHash, arg.ID, arg.PasswordHash)
 	return err
+}
+
+const updateUserName = `-- name: UpdateUserName :one
+UPDATE identity_users SET name = $2 WHERE id = $1
+RETURNING id, email, password_hash, name, role, created_at
+`
+
+type UpdateUserNameParams struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (IdentityUser, error) {
+	row := q.db.QueryRow(ctx, updateUserName, arg.ID, arg.Name)
+	var i IdentityUser
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
 }

@@ -106,3 +106,114 @@ func (r *Repo) MarkPasswordResetUsed(ctx context.Context, tx pgx.Tx, id uuid.UUI
 func toUser(id uuid.UUID, email, hash, name, role string, createdAt time.Time) domain.User {
 	return domain.User{ID: id, Email: email, PasswordHash: hash, Name: name, Role: domain.Role(role), CreatedAt: createdAt}
 }
+
+// --- account (P4) ---
+
+// UpdateUserName sets userID's display name within tx and returns the fresh row.
+func (r *Repo) UpdateUserName(ctx context.Context, tx pgx.Tx, userID uuid.UUID, name string) (domain.User, error) {
+	row, err := r.q.WithTx(tx).UpdateUserName(ctx, identitydb.UpdateUserNameParams{ID: userID, Name: name})
+	if err != nil {
+		return domain.User{}, err
+	}
+	return toUser(row.ID, row.Email, row.PasswordHash, row.Name, row.Role, row.CreatedAt), nil
+}
+
+// ListAddresses returns userID's addresses, default first.
+func (r *Repo) ListAddresses(ctx context.Context, userID uuid.UUID) ([]domain.Address, error) {
+	rows, err := r.q.ListAddresses(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Address, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAddress(row))
+	}
+	return out, nil
+}
+
+// GetAddress looks up an owner-scoped address by id.
+func (r *Repo) GetAddress(ctx context.Context, userID, id uuid.UUID) (domain.Address, error) {
+	row, err := r.q.GetAddress(ctx, identitydb.GetAddressParams{ID: id, UserID: userID})
+	if err != nil {
+		return domain.Address{}, err
+	}
+	return toAddress(row), nil
+}
+
+// CountAddresses counts userID's addresses.
+func (r *Repo) CountAddresses(ctx context.Context, userID uuid.UUID) (int, error) {
+	n, err := r.q.CountAddresses(ctx, userID)
+	return int(n), err
+}
+
+// InsertAddress persists a within tx.
+func (r *Repo) InsertAddress(ctx context.Context, tx pgx.Tx, a domain.Address) error {
+	return r.q.WithTx(tx).InsertAddress(ctx, identitydb.InsertAddressParams{
+		ID:         a.ID,
+		UserID:     a.UserID,
+		Recipient:  a.Recipient,
+		Line1:      a.Line1,
+		Line2:      a.Line2,
+		City:       a.City,
+		Region:     a.Region,
+		PostalCode: a.PostalCode,
+		Country:    a.Country,
+		Phone:      a.Phone,
+		IsDefault:  a.IsDefault,
+	})
+}
+
+// UpdateAddress overwrites an owner-scoped address's fields within tx.
+func (r *Repo) UpdateAddress(ctx context.Context, tx pgx.Tx, a domain.Address) error {
+	return r.q.WithTx(tx).UpdateAddress(ctx, identitydb.UpdateAddressParams{
+		ID:         a.ID,
+		UserID:     a.UserID,
+		Recipient:  a.Recipient,
+		Line1:      a.Line1,
+		Line2:      a.Line2,
+		City:       a.City,
+		Region:     a.Region,
+		PostalCode: a.PostalCode,
+		Country:    a.Country,
+		Phone:      a.Phone,
+		IsDefault:  a.IsDefault,
+	})
+}
+
+// DeleteAddress removes an owner-scoped address within tx, returning the number of rows affected.
+func (r *Repo) DeleteAddress(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) (int64, error) {
+	return r.q.WithTx(tx).DeleteAddress(ctx, identitydb.DeleteAddressParams{ID: id, UserID: userID})
+}
+
+// ClearDefaultAddresses demotes userID's current default (if any) within tx.
+func (r *Repo) ClearDefaultAddresses(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
+	return r.q.WithTx(tx).ClearDefaultAddresses(ctx, userID)
+}
+
+// SetAddressDefault promotes an owner-scoped address to default within tx.
+func (r *Repo) SetAddressDefault(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error {
+	return r.q.WithTx(tx).SetAddressDefault(ctx, identitydb.SetAddressDefaultParams{ID: id, UserID: userID})
+}
+
+// NewestAddressID returns the id of userID's most recently created address, within tx so it sees
+// uncommitted writes earlier in the same transaction.
+func (r *Repo) NewestAddressID(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (uuid.UUID, error) {
+	return r.q.WithTx(tx).NewestAddressID(ctx, userID)
+}
+
+func toAddress(row identitydb.IdentityAddress) domain.Address {
+	return domain.Address{
+		ID:         row.ID,
+		UserID:     row.UserID,
+		Recipient:  row.Recipient,
+		Line1:      row.Line1,
+		Line2:      row.Line2,
+		City:       row.City,
+		Region:     row.Region,
+		PostalCode: row.PostalCode,
+		Country:    row.Country,
+		Phone:      row.Phone,
+		IsDefault:  row.IsDefault,
+		CreatedAt:  row.CreatedAt,
+	}
+}
