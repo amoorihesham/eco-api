@@ -3,6 +3,7 @@ module github.com/amoorihesham/eco-api
 go 1.26.4
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 )

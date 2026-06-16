@@ -86,7 +86,7 @@ tasks:
     desc: Fail if generated code is stale
     cmds:
       - sqlc generate
-      - git diff --exit-code -- internal/platform/db/dbgen
+      - git diff --exit-code -- internal/platform/db/dbgen internal/platform/events/eventsdb
 
   test:integration:
     desc: Run DB-backed integration tests (needs task db:up + task migrate:up)

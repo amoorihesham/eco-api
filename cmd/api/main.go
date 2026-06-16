@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/amoorihesham/eco-api/internal/platform/config"
 	"github.com/amoorihesham/eco-api/internal/platform/db"
+	"github.com/amoorihesham/eco-api/internal/platform/events"
 	"github.com/amoorihesham/eco-api/internal/platform/health"
 	"github.com/amoorihesham/eco-api/internal/platform/httpx"
 	applog "github.com/amoorihesham/eco-api/internal/platform/log"
@@ -24,7 +26,6 @@ func main() {
 
 	logger := applog.New(cfg.LogLevel, cfg.LogFormat)
 
-	// Connect to Postgres before serving; fail fast if it is unreachable.
 	startupCtx, cancel := context.WithTimeout(context.Background(), cfg.DBConnectTimeout)
 	pool, err := db.Open(startupCtx, db.Config{
 		DSN:             cfg.DatabaseURL,
@@ -41,13 +42,27 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Readiness now reflects real DB health.
 	healthH := health.New(health.Check{Name: "postgres", Func: pool.Ping})
+
+	// Event backbone. Modules (P3+) construct their own events.NewOutbox(pool) and register
+	// bus.Subscribe(...) handlers here, before the dispatcher starts.
+	bus := events.NewBus(logger)
+	dispatcher := events.NewDispatcher(pool, bus, logger, cfg.OutboxPollInterval, cfg.OutboxBatchSize)
 
 	router := newRouter(logger, healthH)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Relay committed events off the request path; drains on shutdown.
+	dispatcherDone := make(chan struct{})
+	go func() {
+		defer close(dispatcherDone)
+		logger.Info("outbox dispatcher started")
+		if err := dispatcher.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error("dispatcher stopped with error", slog.String("error", err.Error()))
+		}
+	}()
 
 	srvCfg := httpx.ServerConfig{
 		Addr:            ":" + cfg.HTTPPort,
@@ -61,6 +76,8 @@ func main() {
 		logger.Error("server exited with error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+
+	<-dispatcherDone // wait for the final outbox drain
 	logger.Info("shutdown complete")
 }
 

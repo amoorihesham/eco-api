@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+
 func TestLoadRequiresDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	if _, err := Load(); err == nil {
@@ -27,5 +28,29 @@ func TestLoadDBDefaults(t *testing.T) {
 	}
 	if c.DBConnectTimeout != 5*time.Second {
 		t.Errorf("DBConnectTimeout: want 5s, got %s", c.DBConnectTimeout)
+	}
+}
+
+func TestLoadOutboxDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://eco:ecopass@localhost:5432/eco?sslmode=disable")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if c.OutboxPollInterval != time.Second {
+		t.Errorf("OutboxPollInterval: want 1s, got %s", c.OutboxPollInterval)
+	}
+	if c.OutboxBatchSize != 100 {
+		t.Errorf("OutboxBatchSize: want 100, got %d", c.OutboxBatchSize)
+	}
+}
+
+func TestLoadOutboxBatchSizeZeroIsInvalid(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://eco:ecopass@localhost:5432/eco?sslmode=disable")
+	t.Setenv("OUTBOX_BATCH_SIZE", "0")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when OUTBOX_BATCH_SIZE is 0")
 	}
 }

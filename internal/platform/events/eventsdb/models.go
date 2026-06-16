@@ -2,23 +2,26 @@
 // versions:
 //   sqlc v1.31.1
 
-package dbgen
+package eventsdb
 
 import (
+	"time"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type PlatformOutbox struct {
-	ID           pgtype.UUID
+	ID           uuid.UUID
 	EventType    string
 	Payload      []byte
-	OccurredAt   pgtype.Timestamptz
+	OccurredAt   time.Time
 	DispatchedAt pgtype.Timestamptz
-	CreatedAt    pgtype.Timestamptz
+	CreatedAt    time.Time
 }
 
 type PlatformProcessedEvent struct {
 	Consumer    string
-	EventID     pgtype.UUID
-	ProcessedAt pgtype.Timestamptz
+	EventID     uuid.UUID
+	ProcessedAt time.Time
 }

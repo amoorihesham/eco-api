@@ -26,6 +26,9 @@ type Config struct {
 	DBMaxConnLifetime time.Duration
 	DBMaxConnIdleTime time.Duration
 	DBConnectTimeout  time.Duration
+
+	OutboxPollInterval time.Duration
+	OutboxBatchSize    int32
 }
 
 func Load() (Config, error) {
@@ -39,12 +42,15 @@ func Load() (Config, error) {
 		HTTPIdleTimeout:     envDur("HTTP_IDLE_TIMEOUT", 120*time.Second),
 		HTTPShutdownTimeout: envDur("HTTP_SHUTDOWN_TIMEOUT", 15*time.Second),
 
-		DatabaseURL:       env("DATABASE_URL", "postgres://eco:ecopass@localhost:5432/eco"),
+		DatabaseURL:       env("DATABASE_URL", ""),
 		DBMaxConns:        int32(envInt("DB_MAX_CONNS", 10)),
 		DBMinConns:        int32(envInt("DB_MIN_CONNS", 2)),
 		DBMaxConnLifetime: envDur("DB_MAX_CONN_LIFETIME", time.Hour),
 		DBMaxConnIdleTime: envDur("DB_MAX_CONN_IDLE_TIME", 30*time.Minute),
 		DBConnectTimeout:  envDur("DB_CONNECT_TIMEOUT", 5*time.Second),
+
+		OutboxPollInterval: envDur("OUTBOX_POLL_INTERVAL", time.Second),
+		OutboxBatchSize:    int32(envInt("OUTBOX_BATCH_SIZE", 100)),
 	}
 	if err := c.Validate(); err != nil {
 		return Config{}, err
@@ -74,6 +80,9 @@ func (c Config) Validate() error {
 	}
 	if c.DBMinConns < 0 || c.DBMinConns > c.DBMaxConns {
 		return fmt.Errorf("DB_MIN_CONNS must be 0..DB_MAX_CONNS (%d), got %d", c.DBMaxConns, c.DBMinConns)
+	}
+	if c.OutboxBatchSize < 1 {
+		return fmt.Errorf("OUTBOX_BATCH_SIZE must be >= 1, got %d", c.OutboxBatchSize)
 	}
 	return nil
 }
