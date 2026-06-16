@@ -32,6 +32,7 @@ type Querier interface {
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) error
 	UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (IdentityUser, error)
+	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 }
 
 var _ Querier = (*Queries)(nil)

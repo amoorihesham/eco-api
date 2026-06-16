@@ -79,3 +79,6 @@ UPDATE identity_addresses SET is_default = true WHERE id = $1 AND user_id = $2;
 
 -- name: NewestAddressID :one
 SELECT id FROM identity_addresses WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1;
+
+-- name: UpdateUserRole :exec
+UPDATE identity_users SET role = $2 WHERE id = $1;

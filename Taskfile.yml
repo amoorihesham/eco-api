@@ -10,7 +10,7 @@ vars:
       else
         echo bin/api
       fi
-  SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb internal/modules/identity/repo/identitydb
+  SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb internal/modules/identity/repo/identitydb internal/modules/seller/repo/sellerdb
 
 tasks:
   default:
@@ -110,7 +110,9 @@ tasks:
       - db:up
       - migrate:up
     cmds:
-      - go test -tags integration ./... -count=1
+      # -p 1: integration packages share one Postgres instance and some TRUNCATE shared tables
+      # (e.g. identity_users), so package test binaries must not run concurrently (P5).
+      - go test -tags integration -p 1 ./... -count=1
 
   tools:
     desc: Install dev tools

@@ -201,6 +201,11 @@ func (r *Repo) NewestAddressID(ctx context.Context, tx pgx.Tx, userID uuid.UUID)
 	return r.q.WithTx(tx).NewestAddressID(ctx, userID)
 }
 
+// UpdateUserRole sets userID's role within tx (called by the SellerApproved consumer, P5).
+func (r *Repo) UpdateUserRole(ctx context.Context, tx pgx.Tx, userID uuid.UUID, role string) error {
+	return r.q.WithTx(tx).UpdateUserRole(ctx, identitydb.UpdateUserRoleParams{ID: userID, Role: role})
+}
+
 func toAddress(row identitydb.IdentityAddress) domain.Address {
 	return domain.Address{
 		ID:         row.ID,

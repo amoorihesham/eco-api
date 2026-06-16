@@ -40,3 +40,18 @@ sql:
             go_type: "time.Time"
           - db_type: "uuid"
             go_type: "github.com/google/uuid.UUID"
+  - engine: postgresql
+    schema: "migrations/*.up.sql"
+    queries: "internal/modules/seller/repo/queries"
+    gen:
+      go:
+        package: "sellerdb"
+        out: "internal/modules/seller/repo/sellerdb"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_empty_slices: true
+        overrides:
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"

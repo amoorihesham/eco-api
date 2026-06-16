@@ -42,6 +42,9 @@ type Repository interface {
 	ClearDefaultAddresses(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
 	SetAddressDefault(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error
 	NewestAddressID(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (uuid.UUID, error)
+
+	// --- seller promotion (P5): the SellerApproved consumer flips the role in its dedupe tx ---
+	UpdateUserRole(ctx context.Context, tx pgx.Tx, userID uuid.UUID, role string) error
 }
 
 // Outbox is the publish port (satisfied by *events.Outbox) — kept narrow for testability.

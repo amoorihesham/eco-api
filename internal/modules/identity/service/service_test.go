@@ -60,6 +60,7 @@ func (fakeRepo) SetAddressDefault(context.Context, pgx.Tx, uuid.UUID, uuid.UUID)
 func (fakeRepo) NewestAddressID(context.Context, pgx.Tx, uuid.UUID) (uuid.UUID, error) {
 	return uuid.Nil, pgx.ErrNoRows
 }
+func (fakeRepo) UpdateUserRole(context.Context, pgx.Tx, uuid.UUID, string) error { return nil }
 
 type fakeHasher struct{}
 

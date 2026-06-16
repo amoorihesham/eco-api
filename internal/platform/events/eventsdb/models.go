@@ -66,3 +66,26 @@ type PlatformProcessedEvent struct {
 	EventID     uuid.UUID
 	ProcessedAt time.Time
 }
+
+type SellerApplication struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Status       string
+	StoreName    string
+	Description  string
+	Contact      string
+	RejectReason string
+	CreatedAt    time.Time
+	DecidedAt    pgtype.Timestamptz
+}
+
+type SellerStore struct {
+	ID          uuid.UUID
+	SellerID    uuid.UUID
+	Name        string
+	LogoUrl     string
+	Description string
+	Contact     string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}

@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"log/slog"
@@ -12,9 +13,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5"
+
 	identityhandler "github.com/amoorihesham/eco-api/internal/modules/identity/handler"
 	identityrepo "github.com/amoorihesham/eco-api/internal/modules/identity/repo"
 	identityservice "github.com/amoorihesham/eco-api/internal/modules/identity/service"
+	"github.com/amoorihesham/eco-api/internal/modules/seller"
+	sellerhandler "github.com/amoorihesham/eco-api/internal/modules/seller/handler"
+	sellerrepo "github.com/amoorihesham/eco-api/internal/modules/seller/repo"
+	sellerservice "github.com/amoorihesham/eco-api/internal/modules/seller/service"
 	"github.com/amoorihesham/eco-api/internal/platform/auth"
 	"github.com/amoorihesham/eco-api/internal/platform/config"
 	"github.com/amoorihesham/eco-api/internal/platform/db"
@@ -74,7 +81,22 @@ func main() {
 	// First consumer of UserRegistered (welcome email) is wired in P16:
 	//   bus.Subscribe(identity.EventUserRegistered, events.Idempotent(pool, "notification", ...))
 
-	router := newRouter(logger, healthH, identityH, jwt)
+	// --- seller module (P5): repo → service → handler; consumes identity.Reader for the apply guard ---
+	sellerSvc := sellerservice.New(pool, sellerrepo.New(pool), identitySvc, outbox)
+	sellerH := sellerhandler.New(sellerSvc)
+
+	// First cross-module consumer (P5): identity reacts to SellerApproved by promoting the user's role.
+	// Idempotent + at-least-once; the role flip and the processed-events mark commit in one tx.
+	bus.Subscribe(seller.EventSellerApproved, events.Idempotent(pool, "identity",
+		func(ctx context.Context, tx pgx.Tx, e events.Event) error {
+			var p seller.ApprovedPayload
+			if err := json.Unmarshal(e.Payload, &p); err != nil {
+				return err
+			}
+			return identitySvc.PromoteToSeller(ctx, tx, p.UserID)
+		}))
+
+	router := newRouter(logger, healthH, identityH, sellerH, jwt)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -107,18 +129,14 @@ func main() {
 }
 
 // newRouter wires routes + middleware. Modules mount under /api/v1.
-func newRouter(l *slog.Logger, h *health.Handler, identityH *identityhandler.Handler, verifier auth.Verifier) http.Handler {
+func newRouter(l *slog.Logger, h *health.Handler, identityH *identityhandler.Handler, sellerH *sellerhandler.Handler, verifier auth.Verifier) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.Live)
 	mux.HandleFunc("GET /readyz", h.Ready)
 
-	identityH.Mount(mux, auth.Authn(verifier))
-
-	// Demo the RBAC guard (real role-gated routes arrive in P5+): verify bearer, then require admin.
-	adminPing := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "admin ok"})
-	})
-	mux.Handle("GET /api/v1/admin/ping", auth.Authn(verifier)(auth.RequireRole("admin")(adminPing)))
+	authn := auth.Authn(verifier)
+	identityH.Mount(mux, authn)
+	sellerH.Mount(mux, authn)
 
 	return httpx.Chain(mux, httpx.RequestID(), httpx.Logger(l), httpx.Recoverer(l))
 }
