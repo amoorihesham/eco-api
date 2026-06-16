@@ -1,3 +1,5 @@
+// Package health serves liveness and readiness HTTP endpoints backed by a
+// set of named checks.
 package health
 
 import (

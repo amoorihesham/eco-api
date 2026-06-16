@@ -1,3 +1,5 @@
+// Package httpx provides shared HTTP server building blocks: JSON
+// responses, the standard error envelope, pagination, and middleware.
 package httpx
 
 import "net/http"
@@ -5,6 +7,7 @@ import "net/http"
 // ErrorCode is a machine-readable error code (mirrors OpenAPI ErrorCode).
 type ErrorCode string
 
+// Machine-readable error codes (mirrors OpenAPI ErrorCode).
 const (
 	CodeValidation   ErrorCode = "validation_error"
 	CodeUnauthorized ErrorCode = "unauthorized"
@@ -37,15 +40,17 @@ func WriteError(w http.ResponseWriter, status int, code ErrorCode, msg string, d
 	WriteJSON(w, status, ErrorResponse{Error: ErrorBody{Code: code, Message: msg, Details: details}})
 }
 
-// Convenience wrappers used across handlers.
+// NotFound writes a 404 not_found error envelope.
 func NotFound(w http.ResponseWriter, msg string) {
 	WriteError(w, http.StatusNotFound, CodeNotFound, msg)
 }
 
+// Internal writes a 500 internal error envelope.
 func Internal(w http.ResponseWriter, msg string) {
 	WriteError(w, http.StatusInternalServerError, CodeInternal, msg)
 }
 
+// Unauthorized writes a 401 unauthorized error envelope.
 func Unauthorized(w http.ResponseWriter, msg string) {
 	WriteError(w, http.StatusUnauthorized, CodeUnauthorized, msg)
 }

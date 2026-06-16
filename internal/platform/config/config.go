@@ -1,3 +1,5 @@
+// Package config loads and validates process configuration from
+// environment variables.
 package config
 
 import (
@@ -8,6 +10,7 @@ import (
 	"time"
 )
 
+// Config holds all process configuration loaded from the environment.
 type Config struct {
 	Environment string
 
@@ -29,8 +32,16 @@ type Config struct {
 
 	OutboxPollInterval time.Duration
 	OutboxBatchSize    int32
+
+	AuthJWTSecret  string
+	AuthAccessTTL  time.Duration
+	AuthRefreshTTL time.Duration
+	AuthResetTTL   time.Duration
+	AuthBcryptCost int
 }
 
+// Load reads configuration from environment variables, applying defaults
+// and validating the result.
 func Load() (Config, error) {
 	c := Config{
 		Environment:         env("ENVIRONMENT", "development"),
@@ -51,6 +62,12 @@ func Load() (Config, error) {
 
 		OutboxPollInterval: envDur("OUTBOX_POLL_INTERVAL", time.Second),
 		OutboxBatchSize:    int32(envInt("OUTBOX_BATCH_SIZE", 100)),
+
+		AuthJWTSecret:  env("AUTH_JWT_SECRET", ""),
+		AuthAccessTTL:  envDur("AUTH_ACCESS_TTL", 15*time.Minute),
+		AuthRefreshTTL: envDur("AUTH_REFRESH_TTL", 720*time.Hour),
+		AuthResetTTL:   envDur("AUTH_RESET_TTL", time.Hour),
+		AuthBcryptCost: envInt("AUTH_BCRYPT_COST", 12),
 	}
 	if err := c.Validate(); err != nil {
 		return Config{}, err
@@ -58,10 +75,12 @@ func Load() (Config, error) {
 	return c, nil
 }
 
+// Validate checks that all fields hold acceptable values, returning an
+// error describing the first violation found.
 func (c Config) Validate() error {
 
 	if !oneOf(c.Environment, "development", "staging", "production") {
-		return fmt.Errorf("Environment must be one of: development, staging, production, got %s", c.Environment)
+		return fmt.Errorf("ENVIRONMENT must be one of: development, staging, production, got %s", c.Environment)
 	}
 	if !oneOf(c.LogLevel, "debug", "info", "warn", "error") {
 		return fmt.Errorf("LOG_LEVEL invalid: %q", c.LogLevel)
@@ -83,6 +102,12 @@ func (c Config) Validate() error {
 	}
 	if c.OutboxBatchSize < 1 {
 		return fmt.Errorf("OUTBOX_BATCH_SIZE must be >= 1, got %d", c.OutboxBatchSize)
+	}
+	if len(strings.TrimSpace(c.AuthJWTSecret)) < 32 {
+		return fmt.Errorf("AUTH_JWT_SECRET is required and must be >= 32 bytes")
+	}
+	if c.AuthBcryptCost < 10 || c.AuthBcryptCost > 31 {
+		return fmt.Errorf("AUTH_BCRYPT_COST must be 10..31, got %d", c.AuthBcryptCost)
 	}
 	return nil
 }

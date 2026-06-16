@@ -17,6 +17,8 @@ type ServerConfig struct {
 	ShutdownTimeout time.Duration
 }
 
+// Run starts an HTTP server with handler and blocks until ctx is canceled,
+// then gracefully shuts it down within cfg.ShutdownTimeout.
 func Run(ctx context.Context, l *slog.Logger, cfg ServerConfig, handler http.Handler) error {
 	srv := &http.Server{
 		Addr:         cfg.Addr,

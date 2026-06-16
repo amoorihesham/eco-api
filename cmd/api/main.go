@@ -1,3 +1,5 @@
+// Command api boots the eco-api HTTP server: config, DB pool, event
+// backbone, modules, and graceful shutdown.
 package main
 
 import (
@@ -10,6 +12,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	identityhandler "github.com/amoorihesham/eco-api/internal/modules/identity/handler"
+	identityrepo "github.com/amoorihesham/eco-api/internal/modules/identity/repo"
+	identityservice "github.com/amoorihesham/eco-api/internal/modules/identity/service"
+	"github.com/amoorihesham/eco-api/internal/platform/auth"
 	"github.com/amoorihesham/eco-api/internal/platform/config"
 	"github.com/amoorihesham/eco-api/internal/platform/db"
 	"github.com/amoorihesham/eco-api/internal/platform/env"
@@ -29,7 +35,7 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		os.Stderr.WriteString("config error: " + err.Error() + "\n")
+		_, _ = os.Stderr.WriteString("config error: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
@@ -58,7 +64,17 @@ func main() {
 	bus := events.NewBus(logger)
 	dispatcher := events.NewDispatcher(pool, bus, logger, cfg.OutboxPollInterval, cfg.OutboxBatchSize)
 
-	router := newRouter(logger, healthH)
+	// --- identity module (P3): auth adapters → repo → service → handler ---
+	hasher := auth.NewBcryptHasher(cfg.AuthBcryptCost)
+	jwt := auth.NewJWT(cfg.AuthJWTSecret, cfg.AuthAccessTTL)
+	outbox := events.NewOutbox(pool)
+	identitySvc := identityservice.New(pool, identityrepo.New(pool), hasher, jwt, outbox,
+		identityservice.Config{RefreshTTL: cfg.AuthRefreshTTL, ResetTTL: cfg.AuthResetTTL})
+	identityH := identityhandler.New(identitySvc)
+	// First consumer of UserRegistered (welcome email) is wired in P16:
+	//   bus.Subscribe(identity.EventUserRegistered, events.Idempotent(pool, "notification", ...))
+
+	router := newRouter(logger, healthH, identityH, jwt)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -90,10 +106,19 @@ func main() {
 	logger.Info("shutdown complete")
 }
 
-// newRouter wires routes + middleware. Later phases mount their modules here (under /api/v1).
-func newRouter(l *slog.Logger, h *health.Handler) http.Handler {
+// newRouter wires routes + middleware. Modules mount under /api/v1.
+func newRouter(l *slog.Logger, h *health.Handler, identityH *identityhandler.Handler, verifier auth.Verifier) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.Live)
 	mux.HandleFunc("GET /readyz", h.Ready)
+
+	identityH.Mount(mux, auth.Authn(verifier))
+
+	// Demo the RBAC guard (real role-gated routes arrive in P5+): verify bearer, then require admin.
+	adminPing := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "admin ok"})
+	})
+	mux.Handle("GET /api/v1/admin/ping", auth.Authn(verifier)(auth.RequireRole("admin")(adminPing)))
+
 	return httpx.Chain(mux, httpx.RequestID(), httpx.Logger(l), httpx.Recoverer(l))
 }

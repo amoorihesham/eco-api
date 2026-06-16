@@ -1,3 +1,4 @@
+// Package log builds the application's structured slog.Logger.
 package log
 
 import (
@@ -6,6 +7,8 @@ import (
 	"strings"
 )
 
+// New builds an slog.Logger writing to stdout at the given level
+// ("debug"/"info"/"warn"/"error") and format ("json"/"text").
 func New(level string, format string) *slog.Logger {
 	opts := &slog.HandlerOptions{Level: parseLevel(level)}
 	var h slog.Handler

@@ -10,8 +10,11 @@ import (
 	"time"
 )
 
+// Middleware wraps an http.Handler to add cross-cutting behavior.
 type Middleware func(http.Handler) http.Handler
 
+// Chain applies mws to h in order, so the first middleware in mws runs
+// first on each request.
 func Chain(h http.Handler, mws ...Middleware) http.Handler {
 	for i := len(mws) - 1; i >= 0; i-- {
 		h = mws[i](h)
@@ -23,6 +26,8 @@ type ctxKey int
 
 const requestIDKey ctxKey = iota
 
+// RequestID assigns each request an ID (reusing X-Request-ID if present),
+// echoes it in the response header, and stores it in the request context.
 func RequestID() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +42,8 @@ func RequestID() Middleware {
 	}
 }
 
+// RequestIDFrom returns the request ID stored in ctx by RequestID, or ""
+// if none is present.
 func RequestIDFrom(ctx context.Context) string {
 	if v, ok := ctx.Value(requestIDKey).(string); ok {
 		return v
@@ -44,6 +51,7 @@ func RequestIDFrom(ctx context.Context) string {
 	return ""
 }
 
+// Logger logs each request's method, path, status, and duration using l.
 func Logger(l *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +69,8 @@ func Logger(l *slog.Logger) Middleware {
 	}
 }
 
+// Recoverer recovers from panics in the wrapped handler, logs the panic
+// and stack trace via l, and responds with a 500.
 func Recoverer(l *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

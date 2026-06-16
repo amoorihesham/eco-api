@@ -1,3 +1,5 @@
+// Package db provides the shared pgx connection pool and transaction helper
+// used by every module's repo adapter.
 package db
 
 import (

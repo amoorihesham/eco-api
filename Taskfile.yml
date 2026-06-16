@@ -10,7 +10,7 @@ vars:
       else
         echo bin/api
       fi
-  SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb
+  SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb internal/modules/identity/repo/identitydb
 
 tasks:
   default:

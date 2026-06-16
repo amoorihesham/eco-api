@@ -8,6 +8,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type IdentityPasswordReset struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	UsedAt    pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type IdentityRefreshToken struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type IdentityUser struct {
+	ID           pgtype.UUID
+	Email        string
+	PasswordHash string
+	Name         string
+	Role         string
+	CreatedAt    pgtype.Timestamptz
+}
+
 type PlatformOutbox struct {
 	ID           pgtype.UUID
 	EventType    string

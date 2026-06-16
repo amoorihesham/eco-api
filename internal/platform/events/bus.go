@@ -1,3 +1,5 @@
+// Package events provides the in-process event bus and the transactional
+// outbox used to publish domain events atomically with state changes.
 package events
 
 import (
@@ -15,6 +17,7 @@ type Bus struct {
 	log      *slog.Logger
 }
 
+// NewBus builds an empty Bus that logs via log.
 func NewBus(log *slog.Logger) *Bus {
 	return &Bus{handlers: make(map[string][]Handler), log: log}
 }

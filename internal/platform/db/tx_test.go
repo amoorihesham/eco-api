@@ -21,7 +21,7 @@ func TestRunInTxCommitsOnSuccess(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectCommit()
 
-	if err := db.RunInTx(context.Background(), mock, func(tx pgx.Tx) error { return nil }); err != nil {
+	if err := db.RunInTx(context.Background(), mock, func(_ pgx.Tx) error { return nil }); err != nil {
 		t.Fatalf("want nil, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -40,7 +40,7 @@ func TestRunInTxRollsBackOnError(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectRollback()
 
-	if err := db.RunInTx(context.Background(), mock, func(tx pgx.Tx) error { return want }); !errors.Is(err, want) {
+	if err := db.RunInTx(context.Background(), mock, func(_ pgx.Tx) error { return want }); !errors.Is(err, want) {
 		t.Fatalf("want %v, got %v", want, err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

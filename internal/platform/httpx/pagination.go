@@ -11,6 +11,8 @@ const (
 	maxPageSize     = 100
 )
 
+// PageParams reads "page" and "page_size" query parameters from r,
+// clamping them to sane defaults and bounds.
 func PageParams(r *http.Request) (page, pageSize int) {
 	page = atoiOr(r.URL.Query().Get("page"), defaultPage)
 	if page < 1 {

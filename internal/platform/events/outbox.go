@@ -18,6 +18,7 @@ type Outbox struct {
 	q *eventsdb.Queries
 }
 
+// NewOutbox builds an Outbox backed by pool.
 func NewOutbox(pool *pgxpool.Pool) *Outbox {
 	return &Outbox{q: eventsdb.New(pool)}
 }
@@ -43,6 +44,8 @@ type Dispatcher struct {
 	batch    int32
 }
 
+// NewDispatcher builds a Dispatcher that polls pool every interval, fetching
+// up to batch undispatched events at a time and relaying them to bus.
 func NewDispatcher(pool *pgxpool.Pool, bus Publisher, log *slog.Logger, interval time.Duration, batch int32) *Dispatcher {
 	return &Dispatcher{pool: pool, q: eventsdb.New(pool), bus: bus, log: log, interval: interval, batch: batch}
 }
