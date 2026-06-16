@@ -17,20 +17,25 @@ type ServerConfig struct {
 	ShutdownTimeout time.Duration
 }
 
+type Server struct {
+	Logger *slog.Logger
+	Cfg    ServerConfig
+}
+
 // Run starts an HTTP server with handler and blocks until ctx is canceled,
 // then gracefully shuts it down within cfg.ShutdownTimeout.
-func Run(ctx context.Context, l *slog.Logger, cfg ServerConfig, handler http.Handler) error {
+func (s *Server) Run(ctx context.Context, handler http.Handler) error {
 	srv := &http.Server{
-		Addr:         cfg.Addr,
+		Addr:         s.Cfg.Addr,
 		Handler:      handler,
-		ReadTimeout:  cfg.ReadTimeout,
-		WriteTimeout: cfg.WriteTimeout,
-		IdleTimeout:  cfg.IdleTimeout,
+		ReadTimeout:  s.Cfg.ReadTimeout,
+		WriteTimeout: s.Cfg.WriteTimeout,
+		IdleTimeout:  s.Cfg.IdleTimeout,
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		l.Info("http server listening", slog.String("addr", cfg.Addr))
+		s.Logger.Info("HTTP Server listening", slog.String("address", s.Cfg.Addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -40,8 +45,8 @@ func Run(ctx context.Context, l *slog.Logger, cfg ServerConfig, handler http.Han
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
-		l.Info("shutdown signal received")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		s.Logger.Info("Shutdown signal recived")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.Cfg.ShutdownTimeout)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
 	}

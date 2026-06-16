@@ -111,15 +111,12 @@ func main() {
 		}
 	}()
 
-	srvCfg := httpx.ServerConfig{
-		Addr:            ":" + cfg.HTTPPort,
-		ReadTimeout:     cfg.HTTPReadTimeout,
-		WriteTimeout:    cfg.HTTPWriteTimeout,
-		IdleTimeout:     cfg.HTTPIdleTimeout,
-		ShutdownTimeout: cfg.HTTPShutdownTimeout,
+	srv := &httpx.Server{
+		Logger: logger,
+		Cfg:    httpx.ServerConfig{Addr: cfg.HTTPPort, ReadTimeout: cfg.HTTPReadTimeout, WriteTimeout: cfg.HTTPWriteTimeout, IdleTimeout: cfg.HTTPIdleTimeout, ShutdownTimeout: cfg.HTTPShutdownTimeout},
 	}
 
-	if err := httpx.Run(ctx, logger, srvCfg, router); err != nil {
+	if err := srv.Run(ctx, router); err != nil {
 		logger.Error("server exited with error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
