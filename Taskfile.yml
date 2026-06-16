@@ -1,0 +1,55 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  APP_BIN: bin/api
+
+tasks:
+  default:
+    cmds: [task --list]
+
+  run:
+    desc: Run the API locally
+    cmds: [go run ./cmd/api]
+
+  build:
+    desc: Build the API binary
+    cmds: [go build -o {{.APP_BIN}}, ./cmd/api]
+
+  test:
+    desc: Run all tests
+    cmds: [go test ./... -count=1]
+
+  lint:
+    desc: Run golangci-lint (also checks formatting)
+    cmds: [golangci-lint run]
+
+  fmt:
+    desc: Format the code
+    cmds: [gofmt -w .]
+
+  tidy:
+    desc: Tidy go.mod
+    cmds: [go mod tidy]
+
+  ci:
+    desc: Full local pipeline (tidy, lint, test, build)
+    cmds:
+      - go mod tidy
+      - golangci-lint run
+      - go test ./... -count=1
+      - go build -o {{.APP_BIN}} ./cmd/api
+
+  db:up:
+    desc: Start Postgres
+    cmds: [docker compose up -d db]
+
+  db:down:
+    desc: Stop Postgres and remove containers
+    cmds: [docker compose down]
+
+  tools:
+    desc: Install dev tools
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
