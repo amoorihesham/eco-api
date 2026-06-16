@@ -3,7 +3,13 @@ version: "3"
 dotenv: [".env"]
 
 vars:
-  APP_BIN: bin/api
+  APP_BIN:
+    sh: |
+      if [ "$OS" = "Windows_NT" ]; then
+        echo bin/api.exe
+      else
+        echo bin/api
+      fi
   SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb
 
 tasks:

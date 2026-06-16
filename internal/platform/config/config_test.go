@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 func TestLoadRequiresDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	if _, err := Load(); err == nil {

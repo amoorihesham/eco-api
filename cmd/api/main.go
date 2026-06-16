@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/amoorihesham/eco-api/internal/platform/config"
 	"github.com/amoorihesham/eco-api/internal/platform/db"
+	"github.com/amoorihesham/eco-api/internal/platform/env"
 	"github.com/amoorihesham/eco-api/internal/platform/events"
 	"github.com/amoorihesham/eco-api/internal/platform/health"
 	"github.com/amoorihesham/eco-api/internal/platform/httpx"
@@ -18,6 +20,13 @@ import (
 )
 
 func main() {
+	err := env.Load(".env")
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Fatal(err)
+		}
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		os.Stderr.WriteString("config error: " + err.Error() + "\n")
