@@ -1,9 +1,10 @@
-version: '3'
+version: "3"
 
-dotenv: ['.env']
+dotenv: [".env"]
 
 vars:
   APP_BIN: bin/api
+  SQLC_DIRS: internal/platform/db/dbgen internal/platform/events/eventsdb
 
 tasks:
   default:
@@ -15,7 +16,9 @@ tasks:
 
   build:
     desc: Build the API binary
-    cmds: [go build -o {{.APP_BIN}} ./cmd/api]
+    cmds:
+      - '{{if eq OS "windows"}}powershell -Command "New-Item -ItemType Directory -Force bin"{{else}}mkdir -p bin{{end}}'
+      - go build -o {{.APP_BIN}} ./cmd/api
 
   test:
     desc: Run unit tests (no DB required)
@@ -27,20 +30,32 @@ tasks:
 
   fmt:
     desc: Format the code
-    cmds: [gofmt -w .]
+    cmds:
+      - go fmt ./...
 
   tidy:
     desc: Tidy go.mod
     cmds: [go mod tidy]
 
-  ci:
-    desc: Full local pipeline (tidy, generate, lint, test, build)
+  generate:
+    desc: Run code generation
     cmds:
-      - go mod tidy
+      - go generate ./...
       - sqlc generate
-      - golangci-lint run
-      - go test ./... -count=1
-      - go build -o {{.APP_BIN}} ./cmd/api
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - '{{if eq OS "windows"}}powershell -Command "Remove-Item -Recurse -Force bin -ErrorAction SilentlyContinue"{{else}}rm -rf bin{{end}}'
+
+  ci:
+    desc: Full pipeline
+    cmds:
+      - task tidy
+      - task generate
+      - task lint
+      - task test
+      - task build
 
   # --- database (P0) ---
   db:up:
@@ -60,36 +75,34 @@ tasks:
   migrate:up:
     desc: Apply all up migrations
     cmds:
-      - migrate -path migrations -database "$DATABASE_URL" up
+      - migrate -path migrations -database "{{.DATABASE_URL}}" up
 
   migrate:down:
     desc: Roll back the last migration
     cmds:
-      - migrate -path migrations -database "$DATABASE_URL" down 1
+      - migrate -path migrations -database "{{.DATABASE_URL}}" down 1
 
   migrate:version:
     desc: Print the current migration version
     cmds:
-      - migrate -path migrations -database "$DATABASE_URL" version
+      - migrate -path migrations -database "{{.DATABASE_URL}}" version
 
   migrate:force:
     desc: "Force a version (clear a dirty state): task migrate:force -- <version>"
     cmds:
-      - migrate -path migrations -database "$DATABASE_URL" force {{.CLI_ARGS}}
-
-  sqlc:
-    desc: Generate type-safe Go from SQL
-    cmds:
-      - sqlc generate
+      - migrate -path migrations -database "{{.DATABASE_URL}}" force {{.CLI_ARGS}}
 
   sqlc:check:
     desc: Fail if generated code is stale
     cmds:
       - sqlc generate
-      - git diff --exit-code -- internal/platform/db/dbgen internal/platform/events/eventsdb
+      - git diff --exit-code -- {{.SQLC_DIRS}}
 
   test:integration:
-    desc: Run DB-backed integration tests (needs task db:up + task migrate:up)
+    desc: Run DB-backed integration tests
+    deps:
+      - db:up
+      - migrate:up
     cmds:
       - go test -tags integration ./... -count=1
 
