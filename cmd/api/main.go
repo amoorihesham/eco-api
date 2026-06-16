@@ -9,23 +9,40 @@ import (
 	"syscall"
 
 	"github.com/amoorihesham/eco-api/internal/platform/config"
+	"github.com/amoorihesham/eco-api/internal/platform/db"
 	"github.com/amoorihesham/eco-api/internal/platform/health"
 	"github.com/amoorihesham/eco-api/internal/platform/httpx"
-	appLogger "github.com/amoorihesham/eco-api/internal/platform/log"
+	applog "github.com/amoorihesham/eco-api/internal/platform/log"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		// Logger isn't built yet; report to stderr and exit non-zero.
 		os.Stderr.WriteString("config error: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
-	logger := appLogger.New(cfg.LogLevel, cfg.LogFormat)
-	logger.Info("env vars injected✌️", "ENVIRONMENT", cfg.Environment)
-	// Readiness checks are registered here as phases add dependencies (P1: Postgres).
-	healthH := health.New()
+	logger := applog.New(cfg.LogLevel, cfg.LogFormat)
+
+	// Connect to Postgres before serving; fail fast if it is unreachable.
+	startupCtx, cancel := context.WithTimeout(context.Background(), cfg.DBConnectTimeout)
+	pool, err := db.Open(startupCtx, db.Config{
+		DSN:             cfg.DatabaseURL,
+		MaxConns:        cfg.DBMaxConns,
+		MinConns:        cfg.DBMinConns,
+		MaxConnLifetime: cfg.DBMaxConnLifetime,
+		MaxConnIdleTime: cfg.DBMaxConnIdleTime,
+		ConnectTimeout:  cfg.DBConnectTimeout,
+	})
+	cancel()
+	if err != nil {
+		logger.Error("database connection failed", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	// Readiness now reflects real DB health.
+	healthH := health.New(health.Check{Name: "postgres", Func: pool.Ping})
 
 	router := newRouter(logger, healthH)
 
